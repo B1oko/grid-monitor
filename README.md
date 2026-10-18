@@ -79,6 +79,10 @@ notifications are sent in the language of each device. To add a language, see
 - A background recorder writes samples to SQLite (default every 5 minutes).
 - Configuration (inverters, intervals, retention) is stored in the database and
   edited from the UI. Environment variables are only for bootstrap.
+- Each inverter's serial number is read the first time it answers. If it stops
+  answering for a few minutes (for example because the router gave it a new IP
+  address), the subnet around its last address is scanned for the same serial
+  number and the address is updated. Its history stays with the same inverter.
 
 ## Electricity costs
 
@@ -153,7 +157,11 @@ DATABASE_URL=postgresql+asyncpg://gridmonitor:gridmonitor@db:5432/gridmonitor
 - **Bridge networking** needs the inverter IP typed on the setup page. Discovery
   cannot see your home LAN from Docker Desktop.
 - **Network scans** walk a `/24` and probe Modbus TCP. Only run a scan on a
-  network you own or are authorized to scan.
+  network you own or are authorized to scan. When an inverter stops answering,
+  Grid Monitor scans the subnet of its last address to find it again, at most
+  every 15 minutes.
+- **A fixed IP address** (a DHCP reservation in your router) for the inverter
+  avoids the gap in the history while it is found again.
 - Some inverters (including the SAJ AIO3) accept a limited number of Modbus
   clients. If Home Assistant is already polling the same unit, readings can
   flake. Prefer a single active Modbus reader.

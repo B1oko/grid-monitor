@@ -45,6 +45,7 @@ class InverterOut(BaseModel):
     battery_capacity_kwh: float | None
     enabled: bool
     extra: dict[str, Any] | None
+    serial_number: str | None = None
 
     model_config = {"from_attributes": True}
 

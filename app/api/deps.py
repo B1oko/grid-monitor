@@ -10,6 +10,7 @@ from app.services.alerts import AlertService
 from app.services.discovery import InverterDiscovery
 from app.services.live_manager import LiveHub
 from app.services.notifier import WebPushNotifier
+from app.services.relocator import InverterRelocator
 from app.services.retention import RetentionService
 from app.services.supervisor import InverterSupervisor
 
@@ -25,6 +26,7 @@ class AppState:
     retention: RetentionService
     push: WebPushNotifier
     alerts: AlertService
+    relocator: InverterRelocator
     retention_task: object | None = field(default=None)
 
 

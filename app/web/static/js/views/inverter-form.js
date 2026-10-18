@@ -32,7 +32,7 @@ export function inverterFormHtml(inverter = null) {
                 </select></span></label>`
             : ""
         }
-        ${field({ label: t("inverters.host"), name: "host", type: "text", dataType: "text", value: value("host"), attrs: 'required placeholder="192.168.1.50"' })}
+        ${field({ label: t("inverters.host"), name: "host", type: "text", dataType: "text", value: value("host"), hint: t("inverters.host_hint"), attrs: 'required placeholder="192.168.1.50"' })}
         ${field({ label: t("inverters.port"), name: "port", dataType: "int", value: value("port", 502), attrs: "required min=1 max=65535" })}
         ${field({ label: t("inverters.unit_id"), name: "unit_id", dataType: "int", value: value("unit_id", 1), attrs: "required min=1 max=255" })}
         <label class="field"><span class="field-label">${esc(t("inverters.poll_interval"))}</span>
@@ -70,11 +70,15 @@ export function bindInverterForm(form, { inverter = null, onSaved, onCancel }) {
           status.textContent = text;
         });
         list.innerHTML = candidates
-          .map(
-            (c, i) => `<button type="button" class="candidate" data-i="${i}">
+          .map((c, i) => {
+            const known = c.serial_number && state.inverters.find((item) => item.serial_number === c.serial_number);
+            const details = [c.driver_id, `${Math.round(c.latency_ms)} ms`];
+            if (c.serial_number) details.push(t("inverters.serial", { serial: c.serial_number }));
+            if (known) details.push(t("inverters.already_added", { inverter: known.name }));
+            return `<button type="button" class="candidate" data-i="${i}">
               ${icon("inverter")}<span><strong>${esc(c.host)}:${esc(c.port)}</strong>
-              <small>${esc(c.driver_id)} · ${esc(Math.round(c.latency_ms))} ms</small></span></button>`
-          )
+              <small>${esc(details.join(" · "))}</small></span></button>`;
+          })
           .join("");
         list.querySelectorAll("[data-i]").forEach((button) =>
           button.addEventListener("click", () => {

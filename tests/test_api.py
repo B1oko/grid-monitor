@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 from fastapi.testclient import TestClient
 from sqlalchemy import column
 
-from app.db.models import AlertEvent
+from app.db.models import AlertEvent, Inverter
 from app.db.timebucket import serialize_bucket_ts, time_bucket
 
 
@@ -65,6 +65,28 @@ def test_inverter_crud_and_settings(client: TestClient) -> None:
     deleted = client.delete(f"/api/inverters/{inverter['id']}")
     assert deleted.status_code == 204
     assert client.get("/api/inverters").json() == []
+
+
+def test_changing_connection_forgets_serial_number(client: TestClient) -> None:
+    inverter = client.post(
+        "/api/inverters",
+        json={"name": "Roof", "driver_id": "saj-h2", "host": "192.0.2.10"},
+    ).json()
+    assert inverter["serial_number"] is None
+
+    async def set_serial() -> None:
+        async with client.app.state.core.session_factory() as session:
+            stored = await session.get(Inverter, inverter["id"])
+            stored.serial_number = "H2S1234"
+            await session.commit()
+
+    client.portal.call(set_serial)
+    url = f"/api/inverters/{inverter['id']}"
+    renamed = client.patch(url, json={"name": "Garage", "host": "192.0.2.10"}).json()
+    assert renamed["serial_number"] == "H2S1234"
+
+    moved = client.patch(url, json={"host": "192.0.2.11"}).json()
+    assert moved["serial_number"] is None
 
 
 def test_deleting_inverter_removes_its_alerts(client: TestClient) -> None:

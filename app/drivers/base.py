@@ -56,6 +56,14 @@ class InverterDriver(ABC):
     async def read(self) -> InverterReading:
         """Return a live reading from the inverter."""
 
+    async def identify(self) -> str | None:
+        """Return a hardware id that survives IP changes, such as the serial number.
+
+        Grid Monitor uses it to find the inverter again when it gets a new address.
+        Drivers for models without one keep this default.
+        """
+        return None
+
     async def close(self) -> None:
         return None
 

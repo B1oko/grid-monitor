@@ -36,6 +36,8 @@ class Inverter(Base):
     battery_capacity_kwh: Mapped[float | None] = mapped_column(Float)
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     extra: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    # Learned from the driver; used to find the inverter again after an IP change.
+    serial_number: Mapped[str | None] = mapped_column(String(64))
 
     samples: Mapped[list[InverterSample]] = relationship(
         back_populates="inverter", cascade="all, delete-orphan"

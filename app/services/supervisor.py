@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.db.models import Inverter
@@ -106,6 +107,13 @@ class InverterSupervisor:
             if current is None or _config_changed(current.inverter, inverter):
                 await self._stop_one(inverter.id)
                 await self._start_one(inverter)
+            else:
+                current.inverter = inverter
+
+    async def reload_from_db(self) -> None:
+        async with self._session_factory() as session:
+            inverters = (await session.execute(select(Inverter))).scalars().all()
+        await self.reload(list(inverters))
 
     async def start_live(self) -> None:
         self._live_wanted = True
