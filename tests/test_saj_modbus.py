@@ -6,8 +6,10 @@ import pytest
 from app.drivers.registry import get_driver_class, list_drivers
 from app.drivers.saj.h2 import (
     LIVE_REGISTER_COUNT,
+    SERIAL_NUMBER_REGISTER_COUNT,
     decode_battery_status_registers,
     decode_live_registers,
+    decode_serial_number,
     reading_from_registers,
 )
 
@@ -60,3 +62,23 @@ def test_decode_battery_status_registers() -> None:
 def test_decode_battery_status_registers_rejects_short_response() -> None:
     with pytest.raises(ValueError, match="Expected 2 registers"):
         decode_battery_status_registers([0])
+
+
+def _ascii_registers(text: str) -> list[int]:
+    raw = text.encode("ascii").ljust(SERIAL_NUMBER_REGISTER_COUNT * 2, b"\x00")
+    return [int.from_bytes(raw[i : i + 2], "big") for i in range(0, len(raw), 2)]
+
+
+def test_decode_serial_number() -> None:
+    assert decode_serial_number(_ascii_registers("H2S30K2235001234")) == "H2S30K2235001234"
+    assert decode_serial_number(_ascii_registers("ABC123   ")) == "ABC123"
+
+
+def test_decode_serial_number_without_text() -> None:
+    assert decode_serial_number([0] * SERIAL_NUMBER_REGISTER_COUNT) is None
+    assert decode_serial_number([0xFFFF] * SERIAL_NUMBER_REGISTER_COUNT) is None
+
+
+def test_decode_serial_number_rejects_short_response() -> None:
+    with pytest.raises(ValueError, match="Expected 10 registers"):
+        decode_serial_number([0] * 9)

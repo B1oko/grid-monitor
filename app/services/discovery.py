@@ -9,7 +9,8 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any
 
-from app.drivers.registry import list_driver_classes
+from app.drivers.base import InverterDriver
+from app.drivers.registry import get_driver_class, list_driver_classes
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +28,7 @@ class DiscoveryCandidate:
     driver_id: str
     latency_ms: float
     port: int = 502
+    serial_number: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -34,6 +36,7 @@ class DiscoveryCandidate:
             "driver_id": self.driver_id,
             "latency_ms": self.latency_ms,
             "port": self.port,
+            "serial_number": self.serial_number,
         }
 
 
@@ -72,6 +75,32 @@ def iter_subnet_hosts(subnet: str) -> list[str]:
     return [str(host) for host in network.hosts()]
 
 
+def subnet_around(host: str, prefix_length: int) -> str | None:
+    """Return the subnet that contains ``host``, or None when it is a host name."""
+    try:
+        return str(ipaddress.ip_network(f"{host}/{prefix_length}", strict=False))
+    except ValueError:
+        return None
+
+
+async def read_serial_number(
+    driver_cls: type[InverterDriver],
+    host: str,
+    *,
+    port: int,
+    unit_id: int,
+    timeout: float,
+) -> str | None:
+    driver = driver_cls(host=host, port=port, unit_id=unit_id, timeout_seconds=timeout)
+    try:
+        return await driver.identify()
+    except Exception:
+        logger.debug("Could not read serial number of %s:%s", host, port, exc_info=True)
+        return None
+    finally:
+        await driver.close()
+
+
 async def is_port_open(host: str, port: int, timeout: float) -> bool:
     try:
         _, writer = await asyncio.wait_for(asyncio.open_connection(host, port), timeout=timeout)
@@ -103,12 +132,20 @@ async def probe_drivers(
             ok = False
         latency_ms = round((time.perf_counter() - started) * 1000, 1)
         if ok:
+            serial_number = await read_serial_number(
+                driver_cls,
+                host,
+                port=port,
+                unit_id=driver_cls.meta.default_unit_id,
+                timeout=timeout,
+            )
             candidates.append(
                 DiscoveryCandidate(
                     host=host,
                     driver_id=driver_cls.meta.id,
                     latency_ms=latency_ms,
                     port=port,
+                    serial_number=serial_number,
                 )
             )
     return candidates
@@ -220,14 +257,43 @@ class InverterDiscovery:
             finally:
                 self._in_progress = False
 
-    async def _scan_open_ports(self, subnet: str) -> list[str]:
+    async def locate(
+        self,
+        *,
+        driver_id: str,
+        serial_number: str,
+        port: int,
+        unit_id: int,
+        near: str,
+    ) -> str | None:
+        """Find the address of the inverter with ``serial_number``.
+
+        Scans the subnet around its last known address ``near`` rather than the
+        server's own subnet, so it also works when Grid Monitor runs in a Docker
+        bridge network. Returns None when a scan is already running.
+        """
+        subnet = subnet_around(near, self._subnet_prefix_length)
+        if subnet is None or self._lock.locked():
+            return None
+        driver_cls = get_driver_class(driver_id)
+        async with self._lock:
+            for host in await self._scan_open_ports(subnet, port):
+                found = await read_serial_number(
+                    driver_cls, host, port=port, unit_id=unit_id, timeout=self._probe_timeout
+                )
+                if found == serial_number:
+                    return host
+        return None
+
+    async def _scan_open_ports(self, subnet: str, port: int | None = None) -> list[str]:
         hosts = iter_subnet_hosts(subnet)
         semaphore = asyncio.Semaphore(self._concurrency)
         open_hosts: list[str] = []
+        port = self._port if port is None else port
 
         async def check_host(host: str) -> None:
             async with semaphore:
-                if await is_port_open(host, self._port, self._port_scan_timeout):
+                if await is_port_open(host, port, self._port_scan_timeout):
                     open_hosts.append(host)
 
         await asyncio.gather(*(check_host(host) for host in hosts))

@@ -12,6 +12,10 @@ LIVE_START_ADDRESS = 16533
 LIVE_REGISTER_COUNT = 25
 BATTERY_STATUS_START_ADDRESS = 16494
 BATTERY_STATUS_REGISTER_COUNT = 2
+# Device information block (0x8F00): type, subtype, protocol version, then the
+# serial number as 20 ASCII characters.
+SERIAL_NUMBER_START_ADDRESS = 0x8F03
+SERIAL_NUMBER_REGISTER_COUNT = 10
 
 FIELD_MAP: tuple[tuple[str, int, str], ...] = (
     ("direction_pv", 0, "u16"),
@@ -72,6 +76,17 @@ def decode_battery_status_registers(registers: list[int]) -> dict[str, Any]:
         "battery_temp_c": round(_to_i16(registers[0]) * 0.1, 1),
         "battery_soc_pct": round(registers[1] * 0.01, 2),
     }
+
+
+def decode_serial_number(registers: list[int]) -> str | None:
+    if len(registers) < SERIAL_NUMBER_REGISTER_COUNT:
+        raise ValueError(f"Expected {SERIAL_NUMBER_REGISTER_COUNT} registers, got {len(registers)}")
+    raw = b"".join(value.to_bytes(2, "big") for value in registers[:SERIAL_NUMBER_REGISTER_COUNT])
+    try:
+        text = raw.split(b"\x00", 1)[0].decode("ascii").strip()
+    except UnicodeDecodeError:
+        return None
+    return text if text and text.isprintable() else None
 
 
 def reading_from_registers(
@@ -143,6 +158,12 @@ class SajH2Driver(InverterDriver):
             include_raw_registers=self._include_raw,
             latency_ms=latency_ms,
         )
+
+    async def identify(self) -> str | None:
+        registers = await self._transport.read_holding_registers(
+            SERIAL_NUMBER_START_ADDRESS, SERIAL_NUMBER_REGISTER_COUNT
+        )
+        return decode_serial_number(registers)
 
     async def close(self) -> None:
         await self._transport.close()

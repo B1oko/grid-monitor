@@ -75,6 +75,10 @@ class AcmeX1Driver(InverterDriver):
         registers = await self._transport.read_holding_registers(address=..., count=...)
         return InverterReading(pv_power_w=..., extra={...})
 
+    async def identify(self) -> str | None:
+        registers = await self._transport.read_holding_registers(address=..., count=...)
+        return ...  # serial number decoded from the registers
+
     async def close(self) -> None:
         await self._transport.close()
 
@@ -96,6 +100,11 @@ Map manufacturer-specific fields into the canonical `InverterReading` model
 (`pv_power_w`, `battery_power_w`, `grid_power_w`, `load_power_w`,
 `inverter_power_w`, `battery_soc_pct`, `battery_temp_c`). Put anything else
 in `extra`.
+
+Implement `identify()` if the model reports a serial number (or another id
+that does not change). Grid Monitor stores it and uses it to find the inverter
+again when its IP address changes. Without it, users have to type the new
+address themselves.
 
 ### 2. Add a golden-file test
 

@@ -11,10 +11,13 @@ from app.drivers.registry import get_driver_class
 router = APIRouter(prefix="/api", tags=["inverters"])
 
 
+# Changing any of these may point the inverter at a different device, so the
+# serial number is learned again.
+CONNECTION_FIELDS = ("driver_id", "host", "port", "unit_id")
+
+
 async def _reload(state: AppState) -> None:
-    async with state.session_factory() as session:
-        inverters = (await session.execute(select(Inverter))).scalars().all()
-    await state.supervisor.reload(list(inverters))
+    await state.supervisor.reload_from_db()
 
 
 @router.get("/inverters", response_model=list[InverterOut])
@@ -70,6 +73,10 @@ async def update_inverter(
         inverter = await session.get(Inverter, inverter_id)
         if inverter is None:
             raise HTTPException(status_code=404, detail="Inverter not found")
+        if any(
+            key in values and values[key] != getattr(inverter, key) for key in CONNECTION_FIELDS
+        ):
+            inverter.serial_number = None
         for key, value in values.items():
             setattr(inverter, key, value)
         await session.commit()

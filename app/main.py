@@ -32,6 +32,7 @@ from app.services.alerts import AlertService
 from app.services.discovery import InverterDiscovery
 from app.services.live_manager import LiveHub
 from app.services.notifier import WebPushNotifier, load_or_create_vapid
+from app.services.relocator import InverterRelocator
 from app.services.retention import RetentionService
 from app.services.supervisor import InverterSupervisor
 
@@ -79,6 +80,11 @@ async def lifespan(app: FastAPI):
         probe_timeout=float(cfg["discovery_probe_timeout"]),
         subnet_prefix_length=int(cfg["discovery_subnet_prefix_length"]),
     )
+    relocator = InverterRelocator(
+        session_factory=session_factory,
+        supervisor=supervisor,
+        discovery=discovery_service,
+    )
     retention = RetentionService(session_factory, engine.dialect.name)
     push_notifier = WebPushNotifier(
         session_factory=session_factory,
@@ -102,6 +108,7 @@ async def lifespan(app: FastAPI):
         retention=retention,
         push=push_notifier,
         alerts=alert_service,
+        relocator=relocator,
     )
     app.state.core = state
 
@@ -111,9 +118,11 @@ async def lifespan(app: FastAPI):
 
     state.retention_task = asyncio.create_task(_retention_loop(state), name="retention")
     await alert_service.start()
+    await relocator.start()
 
     yield
 
+    await relocator.stop()
     await alert_service.stop()
     task = state.retention_task
     if task is not None:

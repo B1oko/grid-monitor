@@ -5,6 +5,26 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-10-18
+
+### Added
+
+- Inverters are identified by their serial number, read from the inverter the
+  first time it answers. When an inverter stops answering for a few minutes,
+  the subnet around its last address is scanned for the same serial number and
+  its address is updated, so it keeps recording into the same history after
+  the router gives it a new IP address
+- The SAJ H2 / AIO3 driver reads the serial number, and drivers can implement
+  `identify()` to support this
+- The serial number is shown in Settings → Inverters and in network scan
+  results, which also mark inverters that are already added
+- `serial_number` field in the inverter API
+
+### Changed
+
+- Changing an inverter's model, address, port or unit id forgets its serial
+  number, which is read again from the new connection
+
 ## [0.2.0] - 2026-10-16
 
 ### Added

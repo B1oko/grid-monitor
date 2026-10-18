@@ -192,7 +192,9 @@ function inverterCard(inverter) {
         <span class="alert-icon">${icon("inverter")}</span>
         <div class="grow">
           <h3>${esc(inverter.name)} ${inverter.enabled ? "" : `<span class="pill">${esc(t("inverters.disabled"))}</span>`}</h3>
-          <p class="muted small">${esc(driver ? driver.name : inverter.driver_id)} · ${esc(inverter.host)}:${esc(inverter.port)}</p>
+          <p class="muted small">${esc(driver ? driver.name : inverter.driver_id)} · ${esc(inverter.host)}:${esc(inverter.port)}${
+            inverter.serial_number ? ` · ${esc(t("inverters.serial", { serial: inverter.serial_number }))}` : ""
+          }</p>
         </div>
         <button type="button" class="icon-btn" data-action="edit" aria-label="${esc(t("common.edit"))}">${icon("edit")}</button>
         <button type="button" class="icon-btn danger" data-action="delete" aria-label="${esc(t("common.delete"))}">${icon("trash")}</button>
