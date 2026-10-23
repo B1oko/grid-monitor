@@ -9,7 +9,7 @@ dependencies = [
     "aiosqlite>=0.21.0",
     "alembic>=1.14.0",
     "asyncpg>=0.31.0",
-    "fastapi==0.141.1",
+    "fastapi==0.156.4",
     "pydantic-settings==2.15.0",
     "pymodbus==3.16.1",
     "pywebpush>=2.0.0",
