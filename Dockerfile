@@ -1,4 +1,4 @@
-FROM python:3.14-slim AS builder
+FROM python:3.15-slim AS builder
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
@@ -15,7 +15,7 @@ COPY app ./app
 COPY alembic ./alembic
 COPY alembic.ini ./
 
-FROM python:3.14-slim
+FROM python:3.15-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
